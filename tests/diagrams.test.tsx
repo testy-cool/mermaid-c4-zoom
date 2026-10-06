@@ -2,6 +2,7 @@ import type { On } from 'claude-code'
 import { describe, expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
+import { paint } from '../hooks/paint'
 import { drawMermaid, mermaidBlocks } from '../hooks/register'
 
 const PANE = {
@@ -58,6 +59,23 @@ describe('drawMermaid', () => {
 
   test('reports a bad diagram instead of throwing', () => {
     expect('error' in drawMermaid('pie\n  "a": 1')).toBe(true)
+  })
+})
+
+describe('paint', () => {
+  test('rounds corners and gives each box its own color', () => {
+    const drawn = drawMermaid(FLOW)
+    if (!('art' in drawn)) throw new Error(drawn.error)
+    expect(drawn.art).toContain('╭')
+    expect(drawn.art).not.toContain('┌')
+    const rows = drawn.art.split('\n')
+    const colors = paint(drawn.art)
+    const hueOf = (word: string) => {
+      const r = rows.findIndex(row => row.includes(word))
+      return colors[r]?.[[...rows[r]!].indexOf(word[0]!)]
+    }
+    expect(hueOf('Start')).toBeDefined()
+    expect(hueOf('Start')).not.toEqual(hueOf('Build'))
   })
 })
 

@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Diagram } from '../types'
+import { paint, roundCorners, runs } from './paint'
 import { renderMermaidAscii } from './vendor/mermaid-text.js'
 
 const PANE = 'diagrams'
@@ -32,7 +33,7 @@ export function drawMermaid(source: string): { art: string } | { error: string }
       .trimEnd()
     if (art === '') return { error: 'The diagram drew nothing.' }
 
-    return { art }
+    return { art: roundCorners(art) }
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) }
   }
@@ -173,6 +174,7 @@ export const register: Register = on => {
 
     const drawn = drawMermaid(diagram.source)
     const lines = 'art' in drawn ? drawn.art.split('\n') : []
+    const colors = 'art' in drawn ? paint(drawn.art) : []
     const isTooWide = lines.some(line => [...line].length > width)
 
     return (
@@ -193,7 +195,13 @@ export const register: Register = on => {
           {'art' in drawn ? (
             lines.map((line, i) => (
               <Text key={`l${i}`} wrap="truncate-end">
-                {line === '' ? ' ' : line}
+                {line === ''
+                  ? ' '
+                  : runs(line, colors[i]).map((run, k) => (
+                      <Text key={`r${k}`} color={run.color}>
+                        {run.text}
+                      </Text>
+                    ))}
               </Text>
             ))
           ) : (
