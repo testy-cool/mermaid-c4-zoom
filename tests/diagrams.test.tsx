@@ -3,7 +3,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { paint } from '../hooks/paint'
-import { drawMermaid, mermaidBlocks } from '../hooks/register'
+import { drawMermaid, mermaidBlocks, padLabels } from '../hooks/register'
 
 const PANE = {
   plugin: 'diagrams',
@@ -76,6 +76,19 @@ describe('paint', () => {
     }
     expect(hueOf('Start')).toBeDefined()
     expect(hueOf('Start')).not.toEqual(hueOf('Build'))
+  })
+})
+
+describe('padLabels', () => {
+  test('pads box and diamond label lines, leaves special shapes alone', () => {
+    const out = padLabels('graph TD\n  A["Hi<br>there"] --> B{ok?}\n  B --> C[(db)]')
+    expect(out).toContain('A["\u00a0Hi\u00a0<br>\u00a0there\u00a0"]')
+    expect(out).toContain('B{\u00a0ok?\u00a0}')
+    expect(out).toContain('C[(db)]')
+  })
+
+  test('only touches flowcharts', () => {
+    expect(padLabels('sequenceDiagram\n  A->>B: [x]')).toBe('sequenceDiagram\n  A->>B: [x]')
   })
 })
 

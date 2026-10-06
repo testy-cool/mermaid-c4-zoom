@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Diagram } from '../types'
-import { paint, roundCorners, runs } from './paint'
+import { joinStems, paint, roundCorners, runs } from './paint'
 import { renderMermaidAscii } from './vendor/mermaid-text.js'
 
 const PANE = 'diagrams'
@@ -19,21 +19,52 @@ const TOOL_DESCRIPTION = [
   'classDiagram, erDiagram, xychart-beta. Pie charts and other types are not supported.',
   'Keep labels short; the pane is about 40 to 60 columns wide, so prefer TD over LR',
   'for anything with more than four nodes in a row.',
+  'Avoid arrows that point back up to an earlier node: in text they squeeze between boxes and tangle.',
 ].join(' ')
+
+const NBSP = '\u00a0'
+
+/** Pads each line of a flowchart's [box] and {diamond} labels with a no-break space, so text never touches the border. */
+export function padLabels(source: string): string {
+  if (!/^\s*(graph|flowchart)\b/.test(source)) return source
+  const pad = (inner: string) => {
+    if (/^[([/\\>{]/.test(inner)) return null
+    const quoted = /^".*"$/s.test(inner)
+    const body = quoted ? inner.slice(1, -1) : inner
+    const padded = body
+      .split(/(<br\s*\/?>)/i)
+      .map(part => (/^<br/i.test(part) ? part : `${NBSP}${part.trim()}${NBSP}`))
+      .join('')
+
+    return quoted ? `"${padded}"` : padded
+  }
+
+  return source
+    .replace(/(\w)\[([^\]\n]*)\]/g, (whole, id: string, inner: string) => {
+      const padded = pad(inner)
+      return padded === null ? whole : `${id}[${padded}]`
+    })
+    .replace(/(\w)\{([^}\n]*)\}/g, (whole, id: string, inner: string) => {
+      const padded = pad(inner)
+      return padded === null ? whole : `${id}{${padded}}`
+    })
+}
 
 /** Mermaid source as monospace text art, or the parser's complaint. */
 export function drawMermaid(source: string): { art: string } | { error: string } {
   try {
-    const art = renderMermaidAscii(source.replace(/^(\s*%%[^\n]*\n)+/, ''), {
+    const art = renderMermaidAscii(padLabels(source.replace(/^(\s*%%[^\n]*\n)+/, '')), {
       colorMode: 'none',
       paddingX: 2,
-      paddingY: 1,
+      // Three rows between nodes leave room for a stem, a fork and the arrowhead.
+      paddingY: 3,
+      boxBorderPadding: 0,
     })
       .replace(/[ \t]+$/gm, '')
       .trimEnd()
     if (art === '') return { error: 'The diagram drew nothing.' }
 
-    return { art: roundCorners(art) }
+    return { art: roundCorners(joinStems(art)) }
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) }
   }

@@ -1,20 +1,34 @@
 // Colors for diagram text art. Adapted from prismantis hooks/mermaid.tsx
 // (MIT): each box gets its own pastel, the same label keeps its color,
-// arrows get the accent, lines stay quiet.
+// lines and arrowheads share one quiet color.
 
 /** Catppuccin Mocha pastels, one per box, in turn. */
 const BOX_COLORS = ['#f5c2e7', '#89b4fa', '#a6e3a1', '#f9e2af', '#cba6f7', '#94e2d5', '#fab387']
-const LINE_COLOR = '#7f849c'
-const ARROW_COLOR = '#f5c2e7'
+// Lines and arrowheads share one color, so a head never floats apart from its line.
+const LINE_COLOR = '#9399b2'
 const TEXT_COLOR = '#cdd6f4'
 
 const LINE = /[─-╿◇]/
-const ARROW = /[►◄▲▼▶◀]/
 const ROUND: Record<string, string> = { '┌': '╭', '┐': '╮', '└': '╰', '┘': '╯' }
 
 /** Swaps square corners for round ones, boxes and line bends alike. */
 export function roundCorners(art: string): string {
   return art.replace(/[┌┐└┘]/g, ch => ROUND[ch] ?? ch)
+}
+
+/** Puts a ┬ in a box's bottom edge where a line leaves it straight down. */
+export function joinStems(art: string): string {
+  const grid = art.split('\n').map(line => [...line])
+  grid.forEach((row, r) =>
+    row.forEach((ch, c) => {
+      if (ch !== '─') return
+      const left = row.slice(0, c).join('')
+      const isBottomEdge = /[└╰][─┬┴]*$/.test(left)
+      if (isBottomEdge && grid[r + 1]?.[c] === '│') row[c] = '┬'
+    }),
+  )
+
+  return grid.map(row => row.join('')).join('\n')
 }
 
 type Box = { r: number; c: number; r2: number; c2: number }
@@ -55,8 +69,7 @@ export function paint(art: string): (string | undefined)[][] {
   grid.forEach((row, r) =>
     row.forEach((ch, c) => {
       if (color[r]![c] !== undefined || ch.trim() === '') return
-      if (ARROW.test(ch)) color[r]![c] = ARROW_COLOR
-      else if (LINE.test(ch)) color[r]![c] = LINE_COLOR
+      if (LINE.test(ch) || /[►◄▲▼▶◀]/.test(ch)) color[r]![c] = LINE_COLOR
       else color[r]![c] = TEXT_COLOR
     }),
   )
