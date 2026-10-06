@@ -3,7 +3,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { paint } from '../hooks/paint'
-import { drawMermaid, mermaidBlocks, padLabels } from '../hooks/register'
+import { drawMermaid, labelOf, markZoomable, mermaidBlocks, padLabels } from '../hooks/register'
 
 const PANE = {
   plugin: 'diagrams',
@@ -132,5 +132,51 @@ describe('diagrams pane', () => {
     await ui.press({ key: 'prev' })
     expect(await ui.find({ text: '1/2' })).toBeDefined()
     expect(await ui.find({ text: 'First' })).toBeDefined()
+  })
+})
+
+const CONTEXT = 'graph TD\n  U["Users"] --> APP["App servers<br>many clones"]\n  APP --> DB["Postgres"]'
+const INSIDE = 'graph TD\n  API["API"] --> W["Worker"]'
+
+describe('zoom levels', () => {
+  test('labelOf and markZoomable find and mark the first label line', () => {
+    expect(labelOf(CONTEXT, 'APP')).toBe('App servers')
+    expect(labelOf(CONTEXT, 'NOPE')).toBeUndefined()
+    expect(markZoomable(CONTEXT, ['APP'])).toContain('APP["App servers ▸<br>many clones"]')
+  })
+
+  test('clicking a marked box goes one level in, up comes back', async ($, on) => {
+    seat(on)
+    const ui = await start($)
+
+    const ran = await $.tool.call({
+      tool: 'mcp__diagrams__show_diagram',
+      title: 'Web app',
+      mermaid: CONTEXT,
+      zoom: { APP: { title: 'Inside the app', mermaid: INSIDE } },
+    } as any)
+    expect(JSON.stringify(ran)).toContain('1 zoomed level inside')
+    expect(await ui.find({ type: 'Button', text: 'App servers ▸' })).toBeDefined()
+
+    await ui.press({ key: 'zoom-APP' })
+    expect(await ui.find({ text: 'Inside the app' })).toBeDefined()
+    expect(JSON.stringify(await ui.drawn())).toContain('Worker')
+
+    await ui.press({ key: 'up' })
+    expect(JSON.stringify(await ui.drawn())).toContain('Postgres')
+    expect(await ui.find({ text: 'Inside the app' })).toBeUndefined()
+  })
+
+  test('a zoom key that names no node is refused with the reason', async ($, on) => {
+    seat(on)
+    await start($)
+
+    const ran = await $.tool.call({
+      tool: 'mcp__diagrams__show_diagram',
+      title: 'Web app',
+      mermaid: CONTEXT,
+      zoom: { CACHE: { title: 'x', mermaid: INSIDE } },
+    } as any)
+    expect(JSON.stringify(ran)).toContain('no [box] or {diamond} node with that id')
   })
 })
