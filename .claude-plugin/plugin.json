@@ -1,0 +1,6 @@
+{
+  "name": "diagrams",
+  "version": "0.1.0",
+  "description": "A side pane that draws mermaid diagrams as text art, from a tool the agent calls or from mermaid blocks in its replies",
+  "types": "./types/index.d.ts"
+}
