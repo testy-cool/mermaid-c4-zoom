@@ -20,6 +20,7 @@ const TOOL_DESCRIPTION = [
   'Keep labels short; the pane is about 40 to 60 columns wide, so prefer TD over LR',
   'for anything with more than four nodes in a row.',
   'Avoid arrows that point back up to an earlier node: in text they squeeze between boxes and tangle.',
+  'In labels, avoid * and ~ (read as markdown) and = (fonts may merge it with the character before).',
 ].join(' ')
 
 const NBSP = '\u00a0'
