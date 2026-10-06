@@ -73,7 +73,7 @@ describe('diagrams pane', () => {
     const seen = seat(on)
     const ui = await start($)
 
-    const ran = await $.tool.call({ tool: 'mcp__diagrams__show_diagram', input: { title: 'Release flow', mermaid: FLOW } } as any)
+    const ran = await $.tool.call({ tool: 'mcp__diagrams__show_diagram', title: 'Release flow', mermaid: FLOW } as any)
     expect(JSON.stringify(ran)).toContain('Shown in the diagrams pane')
     expect(seen.opened).toEqual(['diagrams'])
     expect(await ui.find({ text: 'Release flow' })).toBeDefined()
@@ -84,7 +84,7 @@ describe('diagrams pane', () => {
     seat(on)
     await start($)
 
-    const ran = await $.tool.call({ tool: 'mcp__diagrams__show_diagram', input: { title: 'x', mermaid: 'pie\n "a": 1' } } as any)
+    const ran = await $.tool.call({ tool: 'mcp__diagrams__show_diagram', title: 'x', mermaid: 'pie\n "a": 1' } as any)
     expect(JSON.stringify(ran)).toContain('did not parse')
   })
 
@@ -92,7 +92,7 @@ describe('diagrams pane', () => {
     seat(on)
     const ui = await start($)
 
-    await $.tool.call({ tool: 'mcp__diagrams__show_diagram', input: { title: 'First', mermaid: FLOW } } as any)
+    await $.tool.call({ tool: 'mcp__diagrams__show_diagram', title: 'First', mermaid: FLOW } as any)
     await $.turn.start({ text: 'draw', turnId: 't1' })
     await $.turn.complete({ ...DONE, turnId: 't1', answer: '```mermaid\nsequenceDiagram\n  Alice->>Bob: hello\n```' })
     expect(await ui.find({ text: '2/2' })).toBeDefined()

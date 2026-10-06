@@ -121,7 +121,8 @@ export const register: Register = on => {
   })
 
   on('tool.call', { tool: TOOL }, async ($, e) => {
-    const input = (e.input ?? {}) as { title?: unknown; mermaid?: unknown }
+    // MCP tool arguments arrive on the event itself, beside tool and tool_use_id.
+    const input = e as { title?: unknown; mermaid?: unknown }
     const source = typeof input.mermaid === 'string' ? input.mermaid.replace(/^```(?:mermaid)?\s*\n|\n```\s*$/g, '').trim() : ''
     const title = typeof input.title === 'string' && input.title.trim() !== '' ? input.title.trim() : guessTitle(source)
     const drawn = drawMermaid(source)
