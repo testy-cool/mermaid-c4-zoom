@@ -1,0 +1,15 @@
+{
+  "name": "mermaid-c4-zoom",
+  "owner": { "name": "testy-cool", "url": "https://github.com/testy-cool" },
+  "description": "mermaid-c4-zoom: mermaid diagrams with C4-style zoom in a Claude Code side pane.",
+  "plugins": [
+    {
+      "name": "mermaid-c4-zoom",
+      "description": "Draws mermaid diagrams as colored text art in a side pane, with clickable boxes that open the level inside them.",
+      "source": "./",
+      "version": "0.2.0",
+      "category": "productivity",
+      "tags": ["mod", "mermaid", "c4", "diagrams", "architecture"]
+    }
+  ]
+}
