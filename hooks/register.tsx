@@ -6,12 +6,12 @@ import { joinStems, paint, roundCorners, runs } from './paint'
 import { renderMermaidAscii } from './vendor/mermaid-text.js'
 
 const PANE = 'diagrams'
-const TOOL = 'mcp__diagrams__show_diagram'
+const TOOL = 'mcp__mermaid-c4-zoom__show_diagram'
 const MAX_KEPT = 20
 
-const list = atom({ plugin: 'diagrams', key: 'list' } as const, [])
-const shown = atom({ plugin: 'diagrams', key: 'shown' } as const, 0)
-const path = atom({ plugin: 'diagrams', key: 'path' } as const, [])
+const list = atom({ plugin: 'mermaid-c4-zoom', key: 'list' } as const, [])
+const shown = atom({ plugin: 'mermaid-c4-zoom', key: 'shown' } as const, 0)
+const path = atom({ plugin: 'mermaid-c4-zoom', key: 'path' } as const, [])
 
 const TOOL_DESCRIPTION = [
   'Draw a mermaid diagram in the side pane beside the conversation.',

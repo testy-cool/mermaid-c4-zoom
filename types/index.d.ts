@@ -7,7 +7,7 @@ export type Diagram = { id: string; title: string; source: string; zoom?: Record
 
 declare module 'claude-code' {
   interface PluginState {
-    diagrams: {
+    'mermaid-c4-zoom': {
       list: Diagram[]
       shown: number
       /** Node ids zoomed into, from the shown top diagram down. */

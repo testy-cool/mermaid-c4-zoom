@@ -6,7 +6,7 @@ import { paint } from '../hooks/paint'
 import { drawMermaid, labelOf, markZoomable, mermaidBlocks, padLabels } from '../hooks/register'
 
 const PANE = {
-  plugin: 'diagrams',
+  plugin: 'mermaid-c4-zoom',
   surface: 'terminal',
   component: 'Pane',
   requestId: 'diagrams',
@@ -26,7 +26,7 @@ const FLOW = 'graph TD\n  A[Start] --> B[Build]\n  B --> C[Ship]'
 function seat(on: On) {
   const seen = { opened: [] as string[], shown: false }
   on('session.start', () => ({ cwd: '/x' }) as any)
-  on('tool.register', ($, e) => ({ value: { tool: `mcp__diagrams__${e.name}` } }) as any)
+  on('tool.register', ($, e) => ({ value: { tool: `mcp__mermaid-c4-zoom__${e.name}` } }) as any)
   on('command.register', () => ({ value: undefined }) as any)
   on('ui.panes', () => ({ value: seen.shown ? [{ id: 'diagrams', title: 'Diagrams', isShown: true, isFocused: false, isPlaced: true }] : [] }) as any)
   on('ui.open', ($, e) => {
@@ -104,7 +104,7 @@ describe('diagrams pane', () => {
     const seen = seat(on)
     const ui = await start($)
 
-    const ran = await $.tool.call({ tool: 'mcp__diagrams__show_diagram', title: 'Release flow', mermaid: FLOW } as any)
+    const ran = await $.tool.call({ tool: 'mcp__mermaid-c4-zoom__show_diagram', title: 'Release flow', mermaid: FLOW } as any)
     expect(JSON.stringify(ran)).toContain('Shown in the diagrams pane')
     expect(seen.opened).toEqual(['diagrams'])
     expect(await ui.find({ text: 'Release flow' })).toBeDefined()
@@ -115,7 +115,7 @@ describe('diagrams pane', () => {
     seat(on)
     await start($)
 
-    const ran = await $.tool.call({ tool: 'mcp__diagrams__show_diagram', title: 'x', mermaid: 'pie\n "a": 1' } as any)
+    const ran = await $.tool.call({ tool: 'mcp__mermaid-c4-zoom__show_diagram', title: 'x', mermaid: 'pie\n "a": 1' } as any)
     expect(JSON.stringify(ran)).toContain('did not parse')
   })
 
@@ -123,7 +123,7 @@ describe('diagrams pane', () => {
     seat(on)
     const ui = await start($)
 
-    await $.tool.call({ tool: 'mcp__diagrams__show_diagram', title: 'First', mermaid: FLOW } as any)
+    await $.tool.call({ tool: 'mcp__mermaid-c4-zoom__show_diagram', title: 'First', mermaid: FLOW } as any)
     await $.turn.start({ text: 'draw', turnId: 't1' })
     await $.turn.complete({ ...DONE, turnId: 't1', answer: '```mermaid\nsequenceDiagram\n  Alice->>Bob: hello\n```' })
     expect(await ui.find({ text: '2/2' })).toBeDefined()
@@ -150,7 +150,7 @@ describe('zoom levels', () => {
     const ui = await start($)
 
     const ran = await $.tool.call({
-      tool: 'mcp__diagrams__show_diagram',
+      tool: 'mcp__mermaid-c4-zoom__show_diagram',
       title: 'Web app',
       mermaid: CONTEXT,
       zoom: { APP: { title: 'Inside the app', mermaid: INSIDE } },
@@ -172,7 +172,7 @@ describe('zoom levels', () => {
     await start($)
 
     const ran = await $.tool.call({
-      tool: 'mcp__diagrams__show_diagram',
+      tool: 'mcp__mermaid-c4-zoom__show_diagram',
       title: 'Web app',
       mermaid: CONTEXT,
       zoom: { CACHE: { title: 'x', mermaid: INSIDE } },

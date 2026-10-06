@@ -1,6 +1,11 @@
 {
-  "name": "diagrams",
-  "version": "0.1.0",
-  "description": "A side pane that draws mermaid diagrams as text art, from a tool the agent calls or from mermaid blocks in its replies",
+  "name": "mermaid-c4-zoom",
+  "version": "0.2.0",
+  "description": "A side pane in Claude Code that draws mermaid diagrams as colored text art, with C4-style zoom: click a box to see the level inside it",
+  "author": { "name": "testy-cool", "url": "https://github.com/testy-cool" },
+  "homepage": "https://github.com/testy-cool/mermaid-c4-zoom",
+  "repository": "https://github.com/testy-cool/mermaid-c4-zoom",
+  "license": "MIT",
+  "keywords": ["mermaid", "c4", "diagrams", "architecture", "ascii", "claude-code", "mod"],
   "types": "./types/index.d.ts"
 }
