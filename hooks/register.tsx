@@ -3,6 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Diagram } from '../types'
 import { joinStems, paint, roundCorners, runs } from './paint'
+import { ASK_PROBLEM_MAP, cleanTree, groupsOf, isTree, paintTreeLine, treeTitle, wrapTreeLine } from './tree'
 import { renderMermaidAscii } from './vendor/mermaid-text.js'
 
 const PANE = 'diagrams'
@@ -12,6 +13,7 @@ const MAX_KEPT = 20
 const list = atom({ plugin: 'mermaid-c4-zoom', key: 'list' } as const, [])
 const shown = atom({ plugin: 'mermaid-c4-zoom', key: 'shown' } as const, 0)
 const path = atom({ plugin: 'mermaid-c4-zoom', key: 'path' } as const, [])
+const isMapping = atom({ plugin: 'mermaid-c4-zoom', key: 'isMapping' } as const, false)
 
 const TOOL_DESCRIPTION = [
   'Draw a mermaid diagram in the side pane beside the conversation.',
@@ -225,6 +227,28 @@ async function step($: EngineInterface, by: number) {
   await update($, path, () => [])
 }
 
+/** Asks a fork of the agent for a problem map of the session and shows it; the main conversation never sees it. */
+async function mapSession($: EngineInterface) {
+  if (await read($, isMapping)) return
+  await update($, isMapping, () => true)
+  try {
+    await openPane($)
+    const reply = await $.model.fork({ prompt: ASK_PROBLEM_MAP })
+    if (!reply.isAnswered) {
+      await $.ui.toast('Nothing to map yet: the session has no conversation.')
+      return
+    }
+    const text = cleanTree(reply.text)
+    if (!isTree(text)) {
+      await $.ui.toast('The problem map came back in the wrong shape. Try again.')
+      return
+    }
+    await addDiagrams($, [{ id: newId(), title: treeTitle(text), source: text, kind: 'tree' }])
+  } finally {
+    await update($, isMapping, () => false)
+  }
+}
+
 async function zoomIn($: EngineInterface, id: string) {
   await update($, path, ids => [...ids, id])
 }
@@ -261,7 +285,7 @@ export const register: Register = on => {
     })
     await $.command.register({
       name: 'diagrams',
-      description: 'Open or close the diagrams pane',
+      description: 'Open or close the diagrams pane; /diagrams map draws a problem map of this session',
       immediate: true,
     })
 
@@ -298,7 +322,13 @@ export const register: Register = on => {
     return done
   })
 
-  on('command.run', { command: 'diagrams' }, async $ => {
+  on('command.run', { command: 'diagrams' }, async ($, e) => {
+    if (e.args.trim() === 'map') {
+      // On a timer, so the command answers at once while the fork works.
+      $.clock.after(0, () => void mapSession($))
+
+      return { text: 'Mapping this session in the diagrams pane. The agent keeps working; it never sees the map.' }
+    }
     const isOpen = await togglePane($)
 
     return { text: isOpen ? 'Diagrams pane opened.' : 'Diagrams pane closed.' }
@@ -310,20 +340,31 @@ export const register: Register = on => {
     const index = await read($, shown)
     const top = diagrams[index]
     const width = e.props.bodyColumns
+    const mapping = await read($, isMapping)
+    const mapButton = (
+      <Button key="map" plain onPress={() => void mapSession($)}>
+        {mapping ? 'mapping…' : 'map this session'}
+      </Button>
+    )
 
     if (top === undefined) {
       return (
         <Box flexDirection="column" width={width}>
           <Text bold>Diagrams</Text>
           <Text dimColor wrap="wrap">No diagrams yet. Ask the agent to draw one, or it can write a mermaid block in a reply.</Text>
+          <Box marginTop={1}>{mapButton}</Box>
         </Box>
       )
     }
 
     const { diagram, trail, depth } = follow(top, await read($, path))
     const zoomIds = Object.keys(diagram.zoom ?? {})
-    const drawn = drawMermaid(markZoomable(diagram.source, zoomIds))
-    const lines = 'art' in drawn ? drawn.art.split('\n') : []
+    const isTreeView = diagram.kind === 'tree'
+    const drawn = isTreeView ? ({ art: '' } as const) : drawMermaid(markZoomable(diagram.source, zoomIds))
+    const treeSource = isTreeView ? diagram.source.split('\n') : []
+    const treeGroups = groupsOf(treeSource)
+    const treeRows = treeSource.flatMap((line, i) => wrapTreeLine(line, width).map(text => ({ text, group: treeGroups[i] ?? 0 })))
+    const lines = 'art' in drawn && !isTreeView ? drawn.art.split('\n') : []
     const colors = 'art' in drawn ? paint(drawn.art) : []
     const spans = zoomSpans(lines, diagram, zoomIds)
     const isTooWide = lines.some(line => [...line].length > width)
@@ -349,7 +390,17 @@ export const register: Register = on => {
           </Box>
         )}
         <Box flexDirection="column" marginTop={1}>
-          {'art' in drawn ? (
+          {isTreeView ? (
+            treeRows.map((row, i) => (
+              <Text key={`t${i}`}>
+                {paintTreeLine(row.text, row.group).map((run, k) => (
+                  <Text key={`r${k}`} color={run.color} bold={run.bold}>
+                    {run.text}
+                  </Text>
+                ))}
+              </Text>
+            ))
+          ) : 'art' in drawn ? (
             lines.map((line, i) => {
               const parts = runs(line, colors[i])
               const row = spans.filter(span => span.row === i)
@@ -407,7 +458,8 @@ export const register: Register = on => {
             ))}
           </Box>
         )}
-        <Box marginTop={1}>
+        <Box marginTop={1} flexDirection="row" gap={3}>
+          {mapButton}
           <Button key="forget" plain onPress={() => void forget($)}>
             remove this one
           </Button>

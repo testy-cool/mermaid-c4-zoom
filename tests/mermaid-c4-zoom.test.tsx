@@ -1,8 +1,9 @@
 import type { On } from 'claude-code'
-import { describe, expect, test } from 'claude-code/testing'
+import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { paint } from '../hooks/paint'
+import { wrapTreeLine } from '../hooks/tree'
 import { drawMermaid, labelOf, markZoomable, mermaidBlocks, padLabels } from '../hooks/register'
 
 const PANE = {
@@ -178,5 +179,58 @@ describe('zoom levels', () => {
       zoom: { CACHE: { title: 'x', mermaid: INSIDE } },
     } as any)
     expect(JSON.stringify(ran)).toContain('no [box] or {diamond} node with that id')
+  })
+})
+
+const MAP = [
+  'Problem: you want to see which companies are behind the jobs you are shown.',
+  '',
+  'Problem: know who is behind each job I am shown',
+  '│',
+  '├── 1. WHAT to look up',
+  '│   ├── Only companies in my final job list, not all 5.1M jobs',
+  '│   └── Skip companies already looked up (152 done)',
+  '└── 2. WHEN it runs',
+  '    └── By itself, once my final list exists',
+].join('\n')
+
+describe('problem maps', () => {
+  test('a long item wraps under its own branch', () => {
+    const rows = wrapTreeLine('│   ├── Only companies in my final job list, not all 5.1M jobs', 34)
+    expect(rows).toEqual(['│   ├── Only companies in my final', '│   │   job list, not all 5.1M', '│   │   jobs'])
+    expect(rows.every(row => [...row].length <= 34)).toBe(true)
+  })
+
+  test('map this session asks a fork and draws its tree', async ($, on) => {
+    seat(on)
+    const asked: string[] = []
+    on('model.fork', ($, e) => {
+      asked.push(e.prompt)
+
+      return { value: { isAnswered: true, text: '```\n' + MAP + '\n```', usage: {} } } as any
+    })
+    const ui = await start($)
+
+    await ui.press({ key: 'map' })
+    expect(asked[0]).toContain('problem map')
+    expect(await ui.find({ text: 'know who is behind each job I am shown' })).toBeDefined()
+    expect(JSON.stringify(await ui.drawn())).toContain('1. WHAT to look up')
+  })
+
+  test('/diagrams map starts the same thing', async ($, on) => {
+    seat(on)
+    const clock = mock.clock(on)
+    let forks = 0
+    on('model.fork', () => {
+      forks += 1
+
+      return { value: { isAnswered: true, text: MAP, usage: {} } } as any
+    })
+    await $.session.start({ cwd: '/x' } as any)
+
+    const said = await $.command.run({ command: 'diagrams', args: 'map' } as any)
+    expect(JSON.stringify(said)).toContain('Mapping this session')
+    await clock.advance(1)
+    expect(forks).toBe(1)
   })
 })
