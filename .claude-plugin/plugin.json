@@ -1,6 +1,6 @@
 {
   "name": "mermaid-c4-zoom",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A side pane in Claude Code that draws mermaid diagrams as colored text art, with C4-style zoom: click a box to see the level inside it",
   "author": { "name": "testy-cool", "url": "https://github.com/testy-cool" },
   "homepage": "https://github.com/testy-cool/mermaid-c4-zoom",

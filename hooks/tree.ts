@@ -28,6 +28,33 @@ export const ASK_PROBLEM_MAP = [
   '- Use the characters │ ├── └── exactly as shown.',
 ].join('\n')
 
+export const ASK_SESSION_TOC = [
+  'Pause the work for a moment. Do not use tools.',
+  'Write a table of contents of this whole session, as a plain text tree.',
+  'Use exactly this shape, and nothing before or after it:',
+  '',
+  'Session: <what this session was about, in under eight words>',
+  '│',
+  '├── 1. <topic>',
+  '│   ├── <what was done> [seen]',
+  '│   └── Decided: <a choice the person made>',
+  '├── 2. <topic>',
+  '│   └── <...> [tested]',
+  '└── Open',
+  '    └── <something unfinished>',
+  '',
+  'Rules:',
+  '- 3 to 8 numbered topics, in the order they happened.',
+  '- Each topic has 2 to 5 items. Each item is one line under 60 characters.',
+  '- End each finished item with one tag: [seen] if it was shown working on screen,',
+  '  [tested] if it was only checked by tests or commands, [live] if it is published or running for real.',
+  '- Start a choice the person made with "Decided:". Decisions take no tag.',
+  '- Put real file paths, repo names and commands in items where they help find the work.',
+  '- The last group is Open: what is unfinished or never seen working. If nothing, one item: nothing open.',
+  '- Plain everyday words a high school student would understand.',
+  '- Use the characters │ ├── └── exactly as shown.',
+].join('\n')
+
 /** Pastels for the numbered groups, in turn (Catppuccin Mocha). */
 const GROUP_COLORS = ['#f5c2e7', '#89b4fa', '#a6e3a1', '#f9e2af', '#cba6f7', '#94e2d5', '#fab387', '#f38ba8']
 const GLYPH_COLOR = '#9399b2'
@@ -41,18 +68,23 @@ export function cleanTree(reply: string): string {
     .trim()
 }
 
-/** True when the text looks like a tree: a Problem line and some branches. */
+const HEAD = /^(Problem|Session):/
+
+/** True when the text looks like a tree: a Problem or Session line and some branches. */
 export function isTree(text: string): boolean {
-  return /^Problem:/m.test(text) && /[├└]──/.test(text)
+  return /^(Problem|Session):/m.test(text) && /[├└]──/.test(text)
 }
 
-/** The tree's own title: its short Problem line, else the first one. */
+/** The tree's own title: its short head line (the second Problem line of a map), else the first. */
 export function treeTitle(text: string): string {
-  const problems = text.split('\n').filter(line => line.startsWith('Problem:'))
-  const pick = problems.length > 1 ? problems[1] : problems[0]
+  const heads = text.split('\n').filter(line => HEAD.test(line))
+  const pick = heads.length > 1 ? heads[1] : heads[0]
 
-  return (pick ?? 'Problem map').replace(/^Problem:\s*/, '').slice(0, 60)
+  return (pick ?? 'Session').replace(HEAD, '').trim().slice(0, 60)
 }
+
+/** Colors for the state tags a table of contents ends its items with. */
+const TAG_COLORS: Record<string, string> = { seen: '#a6e3a1', live: '#89b4fa', tested: '#f9e2af' }
 
 /**
  * Wraps one tree line to a width, carrying its branch glyphs down so the
@@ -88,7 +120,7 @@ export type TreeRun = { text: string; color?: string; bold?: boolean; dim?: bool
 
 /** One tree line as colored runs; `group` is the number of the group the line sits in, 0 above the first. */
 export function paintTreeLine(line: string, group: number): TreeRun[] {
-  if (line.startsWith('Problem:')) return [{ text: line, bold: true }]
+  if (HEAD.test(line)) return [{ text: line, bold: true }]
   const glyphs = /^[│├└─\s]*/.exec(line)?.[0] ?? ''
   const rest = line.slice(glyphs.length)
   const runs: TreeRun[] = []
@@ -96,7 +128,17 @@ export function paintTreeLine(line: string, group: number): TreeRun[] {
   if (rest === '') return runs.length > 0 ? runs : [{ text: ' ' }]
   const heading = /^\d+\.\s/.test(rest)
   const hue = GROUP_COLORS[(Math.max(group, 1) - 1) % GROUP_COLORS.length]
-  runs.push(heading ? { text: rest, color: hue, bold: true } : { text: rest })
+  if (heading || rest === 'Open') {
+    runs.push({ text: rest, color: rest === 'Open' ? '#f38ba8' : hue, bold: true })
+    return runs
+  }
+  const tag = /^(.*?)(\s*)\[(seen|tested|live)\]$/.exec(rest)
+  if (tag) {
+    runs.push({ text: `${tag[1]}${tag[2]}` }, { text: `[${tag[3]}]`, color: TAG_COLORS[tag[3]!] })
+    return runs
+  }
+  const decided = /^Decided:/.test(rest)
+  runs.push(decided ? { text: rest, color: '#cba6f7' } : { text: rest })
 
   return runs
 }

@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Diagram } from '../types'
 import { joinStems, paint, roundCorners, runs } from './paint'
-import { ASK_PROBLEM_MAP, cleanTree, groupsOf, isTree, paintTreeLine, treeTitle, wrapTreeLine } from './tree'
+import { ASK_PROBLEM_MAP, ASK_SESSION_TOC, cleanTree, groupsOf, isTree, paintTreeLine, treeTitle, wrapTreeLine } from './tree'
 import { renderMermaidAscii } from './vendor/mermaid-text.js'
 
 const PANE = 'diagrams'
@@ -227,20 +227,25 @@ async function step($: EngineInterface, by: number) {
   await update($, path, () => [])
 }
 
-/** Asks a fork of the agent for a problem map of the session and shows it; the main conversation never sees it. */
-async function mapSession($: EngineInterface) {
+const TREES = {
+  map: { prompt: ASK_PROBLEM_MAP, name: 'problem map' },
+  toc: { prompt: ASK_SESSION_TOC, name: 'table of contents' },
+} as const
+
+/** Asks a fork of the agent for a tree of the session (a problem map or a table of contents) and shows it; the main conversation never sees it. */
+async function mapSession($: EngineInterface, which: keyof typeof TREES = 'map') {
   if (await read($, isMapping)) return
   await update($, isMapping, () => true)
   try {
     await openPane($)
-    const reply = await $.model.fork({ prompt: ASK_PROBLEM_MAP })
+    const reply = await $.model.fork({ prompt: TREES[which].prompt })
     if (!reply.isAnswered) {
       await $.ui.toast('Nothing to map yet: the session has no conversation.')
       return
     }
     const text = cleanTree(reply.text)
     if (!isTree(text)) {
-      await $.ui.toast('The problem map came back in the wrong shape. Try again.')
+      await $.ui.toast(`The ${TREES[which].name} came back in the wrong shape. Try again.`)
       return
     }
     await addDiagrams($, [{ id: newId(), title: treeTitle(text), source: text, kind: 'tree' }])
@@ -285,7 +290,7 @@ export const register: Register = on => {
     })
     await $.command.register({
       name: 'diagrams',
-      description: 'Open or close the diagrams pane; /diagrams map draws a problem map of this session',
+      description: 'Open or close the diagrams pane; /diagrams map draws a problem map, /diagrams toc a table of contents of this session',
       immediate: true,
     })
 
@@ -323,11 +328,12 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'diagrams' }, async ($, e) => {
-    if (e.args.trim() === 'map') {
+    const arg = e.args.trim()
+    if (arg === 'map' || arg === 'toc') {
       // On a timer, so the command answers at once while the fork works.
-      $.clock.after(0, () => void mapSession($))
+      $.clock.after(0, () => void mapSession($, arg))
 
-      return { text: 'Mapping this session in the diagrams pane. The agent keeps working; it never sees the map.' }
+      return { text: arg === 'toc' ? 'Writing a table of contents of this session in the diagrams pane. The agent keeps working; it never sees it.' : 'Mapping this session in the diagrams pane. The agent keeps working; it never sees the map.' }
     }
     const isOpen = await togglePane($)
 
@@ -341,10 +347,17 @@ export const register: Register = on => {
     const top = diagrams[index]
     const width = e.props.bodyColumns
     const mapping = await read($, isMapping)
-    const mapButton = (
-      <Button key="map" plain onPress={() => void mapSession($)}>
-        {mapping ? 'mapping…' : 'map this session'}
-      </Button>
+    const mapButton = mapping ? (
+      <Text dimColor>writing…</Text>
+    ) : (
+      <Box flexDirection="row" gap={3}>
+        <Button key="map" plain onPress={() => void mapSession($, 'map')}>
+          problem map
+        </Button>
+        <Button key="toc" plain onPress={() => void mapSession($, 'toc')}>
+          table of contents
+        </Button>
+      </Box>
     )
 
     if (top === undefined) {

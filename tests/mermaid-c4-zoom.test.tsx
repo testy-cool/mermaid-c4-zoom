@@ -3,7 +3,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { paint } from '../hooks/paint'
-import { wrapTreeLine } from '../hooks/tree'
+import { paintTreeLine, wrapTreeLine } from '../hooks/tree'
 import { drawMermaid, labelOf, markZoomable, mermaidBlocks, padLabels } from '../hooks/register'
 
 const PANE = {
@@ -232,5 +232,40 @@ describe('problem maps', () => {
     expect(JSON.stringify(said)).toContain('Mapping this session')
     await clock.advance(1)
     expect(forks).toBe(1)
+  })
+})
+
+const TOC = [
+  'Session: a diagrams side pane for Claude Code',
+  '│',
+  '├── 1. First version',
+  '│   ├── Side pane draws mermaid as text art [seen]',
+  '│   └── Decided: name it mermaid-c4-zoom',
+  '└── Open',
+  '    └── Problem map never seen on screen',
+].join('\n')
+
+describe('table of contents', () => {
+  test('state tags get their own color, decisions and Open stand out', () => {
+    const seen = paintTreeLine('│   ├── Side pane draws mermaid as text art [seen]', 1)
+    expect(seen.at(-1)).toEqual({ text: '[seen]', color: '#a6e3a1' })
+    expect(paintTreeLine('│   └── Decided: name it', 1).at(-1)?.color).toBe('#cba6f7')
+    expect(paintTreeLine('└── Open', 1).at(-1)).toMatchObject({ text: 'Open', bold: true })
+  })
+
+  test('the table of contents button asks a fork and draws the tree', async ($, on) => {
+    seat(on)
+    const asked: string[] = []
+    on('model.fork', ($, e) => {
+      asked.push(e.prompt)
+
+      return { value: { isAnswered: true, text: TOC, usage: {} } } as any
+    })
+    const ui = await start($)
+
+    await ui.press({ key: 'toc' })
+    expect(asked[0]).toContain('table of contents')
+    expect(await ui.find({ text: 'a diagrams side pane for Claude Code' })).toBeDefined()
+    expect(JSON.stringify(await ui.drawn())).toContain('[seen]')
   })
 })
