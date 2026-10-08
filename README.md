@@ -63,6 +63,12 @@ Then run `/reload-plugins` in an open session, or start a new one.
 
 - `/diagrams` opens or closes the pane.
 
+- `/diagrams map`, or the `map this session` button, draws a problem map
+  of the session: the business problem in plain words, then numbered
+  groups of why, what, how and where, as a text tree. A side copy of
+  Claude writes it from the conversation. The main conversation never
+  sees the question or the map.
+
 - `‹` and `›` page between the diagrams of the session. `remove this
   one` drops the one on screen.
 
