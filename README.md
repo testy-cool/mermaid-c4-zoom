@@ -72,7 +72,10 @@ Then run `/reload-plugins` in an open session, or start a new one.
 - `/diagrams toc`, or the `table of contents` button, draws a table of
   contents of the session as a tree: topics in order, each item tagged
   `[seen]`, `[tested]` or `[live]`, the choices you made, and what is
-  still open. Written the same way, by a side copy of Claude.
+  still open. Written the same way, by a side copy of Claude. Each topic
+  starts with the local time it began, read from your own messages in
+  the session's transcript (needs `sh` and `grep`; without them the
+  table has no times).
 
 - `‹` and `›` page between the diagrams of the session. `remove this
   one` drops the one on screen.

@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Diagram } from '../types'
 import { joinStems, paint, roundCorners, runs } from './paint'
-import { ASK_PROBLEM_MAP, ASK_SESSION_TOC, cleanTree, groupsOf, isTree, paintTreeLine, treeTitle, wrapTreeLine } from './tree'
+import { ASK_PROBLEM_MAP, cleanTree, parsePromptTimes, tocPrompt, groupsOf, isTree, paintTreeLine, treeTitle, wrapTreeLine } from './tree'
 import { renderMermaidAscii } from './vendor/mermaid-text.js'
 
 const PANE = 'diagrams'
@@ -13,6 +13,7 @@ const MAX_KEPT = 20
 const list = atom({ plugin: 'mermaid-c4-zoom', key: 'list' } as const, [])
 const shown = atom({ plugin: 'mermaid-c4-zoom', key: 'shown' } as const, 0)
 const path = atom({ plugin: 'mermaid-c4-zoom', key: 'path' } as const, [])
+const transcriptPath = atom({ plugin: 'mermaid-c4-zoom', key: 'transcriptPath' } as const, '')
 const isMapping = atom({ plugin: 'mermaid-c4-zoom', key: 'isMapping' } as const, false)
 
 const TOOL_DESCRIPTION = [
@@ -228,9 +229,22 @@ async function step($: EngineInterface, by: number) {
 }
 
 const TREES = {
-  map: { prompt: ASK_PROBLEM_MAP, name: 'problem map' },
-  toc: { prompt: ASK_SESSION_TOC, name: 'table of contents' },
+  map: { name: 'problem map' },
+  toc: { name: 'table of contents' },
 } as const
+
+/** The person's typed prompts with local times, read from the transcript with grep; empty when it cannot. */
+async function promptTimes($: EngineInterface): Promise<string[]> {
+  const file = await read($, transcriptPath)
+  if (file === '') return []
+  try {
+    const ran = await $.process.run(['sh', '-c', 'date +%z; grep -F \'"origin":{"kind":"human"\' "$1"', 'sh', file])
+
+    return parsePromptTimes(ran.stdout)
+  } catch {
+    return []
+  }
+}
 
 /** Asks a fork of the agent for a tree of the session (a problem map or a table of contents) and shows it; the main conversation never sees it. */
 async function mapSession($: EngineInterface, which: keyof typeof TREES = 'map') {
@@ -238,7 +252,8 @@ async function mapSession($: EngineInterface, which: keyof typeof TREES = 'map')
   await update($, isMapping, () => true)
   try {
     await openPane($)
-    const reply = await $.model.fork({ prompt: TREES[which].prompt })
+    const prompt = which === 'toc' ? tocPrompt(await promptTimes($)) : ASK_PROBLEM_MAP
+    const reply = await $.model.fork({ prompt })
     if (!reply.isAnswered) {
       await $.ui.toast('Nothing to map yet: the session has no conversation.')
       return
@@ -293,6 +308,13 @@ export const register: Register = on => {
       description: 'Open or close the diagrams pane; /diagrams map draws a problem map, /diagrams toc a table of contents of this session',
       immediate: true,
     })
+
+    return next(e)
+  })
+
+  // The transcript file holds each prompt's time; the classic hook is where its path shows.
+  on('classic.UserPromptSubmit', async ($, e, next) => {
+    await update($, transcriptPath, () => e.transcript_path)
 
     return next(e)
   })

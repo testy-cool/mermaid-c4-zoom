@@ -55,6 +55,51 @@ export const ASK_SESSION_TOC = [
   '- Use the characters │ ├── └── exactly as shown.',
 ].join('\n')
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * The person's typed prompts with local times, one line each, from the output
+ * of `date +%z` followed by the transcript rows grep picked out.
+ */
+export function parsePromptTimes(stdout: string, max = 60): string[] {
+  const [zone = '+0000', ...rows] = stdout.split('\n')
+  const z = /^([+-])(\d\d)(\d\d)$/.exec(zone.trim())
+  const offset = z ? (z[1] === '-' ? -1 : 1) * (Number(z[2]) * 60 + Number(z[3])) * 60000 : 0
+  const lines: string[] = []
+  for (const row of rows) {
+    if (row.trim() === '') continue
+    try {
+      const d = JSON.parse(row) as { timestamp?: string; message?: { content?: unknown } }
+      const text = d.message?.content
+      const at = Date.parse(d.timestamp ?? '')
+      if (typeof text !== 'string' || Number.isNaN(at)) continue
+      const t = new Date(at + offset)
+      const hh = String(t.getUTCHours()).padStart(2, '0')
+      const mm = String(t.getUTCMinutes()).padStart(2, '0')
+      const said = text.replace(/\s+/g, ' ').trim().slice(0, 80)
+      lines.push(`${MONTHS[t.getUTCMonth()]} ${t.getUTCDate()} ${hh}:${mm}  ${said}`)
+    } catch {
+      // A row cut short or not JSON: skip it.
+    }
+  }
+
+  return lines.slice(-max)
+}
+
+/** The table of contents prompt, with the person's prompt times when there are any. */
+export function tocPrompt(times: string[]): string {
+  if (times.length === 0) return ASK_SESSION_TOC
+
+  return [
+    ASK_SESSION_TOC,
+    '- Start each numbered topic with the local time it began, taken from the list below:',
+    '  "├── 1. 22:45 First version". When topics span days, give the day at each change: "├── 4. Oct 7 15:00 ...".',
+    '',
+    'The person\'s own messages in this session, with local times:',
+    ...times,
+  ].join('\n')
+}
+
 /** Pastels for the numbered groups, in turn (Catppuccin Mocha). */
 const GROUP_COLORS = ['#f5c2e7', '#89b4fa', '#a6e3a1', '#f9e2af', '#cba6f7', '#94e2d5', '#fab387', '#f38ba8']
 const GLYPH_COLOR = '#9399b2'
@@ -128,8 +173,14 @@ export function paintTreeLine(line: string, group: number): TreeRun[] {
   if (rest === '') return runs.length > 0 ? runs : [{ text: ' ' }]
   const heading = /^\d+\.\s/.test(rest)
   const hue = GROUP_COLORS[(Math.max(group, 1) - 1) % GROUP_COLORS.length]
-  if (heading || rest === 'Open') {
-    runs.push({ text: rest, color: rest === 'Open' ? '#f38ba8' : hue, bold: true })
+  if (heading) {
+    const timed = /^(\d+\.\s)((?:[A-Z][a-z]{2} \d{1,2} )?\d{1,2}:\d{2}\s+)(.*)$/.exec(rest)
+    if (timed) runs.push({ text: timed[1]!, color: hue, bold: true }, { text: timed[2]!, color: GLYPH_COLOR }, { text: timed[3]!, color: hue, bold: true })
+    else runs.push({ text: rest, color: hue, bold: true })
+    return runs
+  }
+  if (rest === 'Open') {
+    runs.push({ text: rest, color: '#f38ba8', bold: true })
     return runs
   }
   const tag = /^(.*?)(\s*)\[(seen|tested|live)\]$/.exec(rest)

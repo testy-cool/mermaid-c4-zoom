@@ -15,6 +15,8 @@ declare module 'claude-code' {
       path: string[]
       /** A fork of the agent is writing a problem map. */
       isMapping: boolean
+      /** The session's transcript file, where prompt times are read from. */
+      transcriptPath: string
     }
   }
 }

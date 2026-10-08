@@ -3,7 +3,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { paint } from '../hooks/paint'
-import { paintTreeLine, wrapTreeLine } from '../hooks/tree'
+import { paintTreeLine, parsePromptTimes, tocPrompt, wrapTreeLine } from '../hooks/tree'
 import { drawMermaid, labelOf, markZoomable, mermaidBlocks, padLabels } from '../hooks/register'
 
 const PANE = {
@@ -267,5 +267,25 @@ describe('table of contents', () => {
     expect(asked[0]).toContain('table of contents')
     expect(await ui.find({ text: 'a diagrams side pane for Claude Code' })).toBeDefined()
     expect(JSON.stringify(await ui.drawn())).toContain('[seen]')
+  })
+})
+
+describe('prompt times', () => {
+  const row = (ts: string, content: unknown) => JSON.stringify({ type: 'user', message: { role: 'user', content }, timestamp: ts, origin: { kind: 'human' } })
+
+  test('turns transcript rows into local times and short prompts', () => {
+    const out = ['+0300', row('2026-10-06T20:45:54.234Z', 'Can you make a mod\nthat draws diagrams?'), row('2026-10-07T13:00:00Z', [{ type: 'text' }]), 'not json', ''].join('\n')
+    expect(parsePromptTimes(out)).toEqual(['Oct 6 23:45  Can you make a mod that draws diagrams?'])
+  })
+
+  test('the table of contents asks for times only when there are some', () => {
+    expect(tocPrompt([])).not.toContain('local time')
+    expect(tocPrompt(['Oct 6 23:45  hi'])).toContain('Oct 6 23:45  hi')
+  })
+
+  test('a timed topic heading draws its time in gray', () => {
+    const runs = paintTreeLine('├── 1. 23:45 First version', 1)
+    expect(runs.map(r => r.text)).toEqual(['├── ', '1. ', '23:45 ', 'First version'])
+    expect(runs[2]?.color).toBe('#9399b2')
   })
 })
